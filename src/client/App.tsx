@@ -16,6 +16,7 @@ import StopRounded from '@mui/icons-material/StopRounded';
 import TerminalRounded from '@mui/icons-material/TerminalRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -160,6 +161,10 @@ const tokens = {
   recessed: '#eef2f7',
   successSoft: '#edf8f1',
   warningSurface: '#fff7ed',
+  decision: '#6d5dfc',
+  decisionDark: '#4f46e5',
+  decisionSurface: '#f4f2ff',
+  decisionLine: '#c9c2ff',
   dangerSoft: '#fff1f2',
 };
 const eliAgentUrl = new URL('./assets/eli-agent.png', import.meta.url).href;
@@ -188,6 +193,7 @@ export function App() {
   const [reasoningEffort, setReasoningEffort] = useState<AgentTask['reasoningEffort']>('medium');
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState('');
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'offline'>('connecting');
   const [error, setError] = useState<string>('');
 
@@ -195,7 +201,8 @@ export function App() {
   const tasks = stateQuery.data.tasks;
   const permissions = stateQuery.data.permissions;
   const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) ?? folders[0];
-  const activeTask = tasks.find((task) => task.status === 'running') ?? tasks[0];
+  const runningTask = tasks.find((task) => task.status === 'running');
+  const activeTask = tasks.find((task) => task.id === selectedTaskId) ?? runningTask ?? tasks[0];
   const folderAgents = selectedFolder?.githubAssets.filter((asset) => asset.kind === 'agent') ?? [];
   const folderSkills = selectedFolder?.githubAssets.filter((asset) => asset.kind === 'skill') ?? [];
   const selectedTimeline = activeTask ? timeline.filter((row) => row.taskId === activeTask.id) : timeline;
@@ -225,7 +232,10 @@ export function App() {
   });
   const startTaskMutation = useMutation({
     mutationFn: startTask,
-    onSuccess: (task) => mergeServerEvent({ type: 'task.updated', data: task }),
+    onSuccess: (task) => {
+      mergeServerEvent({ type: 'task.updated', data: task });
+      setSelectedTaskId(task.id);
+    },
   });
   const abortTaskMutation = useMutation({
     mutationFn: abortTask,
@@ -278,6 +288,19 @@ export function App() {
       current.filter((skillId) => selectedFolder.githubAssets.some((asset) => asset.kind === 'skill' && asset.id === skillId)),
     );
   }, [selectedFolder]);
+
+  useEffect(() => {
+    if (tasks.length === 0) {
+      if (selectedTaskId) {
+        setSelectedTaskId('');
+      }
+      return;
+    }
+
+    if (!selectedTaskId || !tasks.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId((runningTask ?? tasks[0]).id);
+    }
+  }, [runningTask, selectedTaskId, tasks]);
 
   useEffect(() => {
     if (!modelsQuery.data?.length) {
@@ -815,7 +838,14 @@ export function App() {
                       <EmptyState text="No runs yet." />
                     ) : (
                       <Stack spacing={0.6}>
-                        {tasks.map((task) => <TaskRow key={task.id} task={task} active={task.id === activeTask?.id} />)}
+                        {tasks.map((task) => (
+                          <TaskRow
+                            key={task.id}
+                            task={task}
+                            active={task.id === activeTask?.id}
+                            onSelect={() => setSelectedTaskId(task.id)}
+                          />
+                        ))}
                       </Stack>
                     )}
                   </Box>
@@ -944,7 +974,7 @@ function EliMark({
   size?: number;
   contrast?: 'blue' | 'light';
 }) {
-  const accent = tone === 'waiting' ? theme.palette.warning.main : tokens.ultramarine;
+  const accent = tone === 'waiting' ? tokens.decision : tokens.ultramarine;
   const imageHeight = Math.max(18, size);
   const imageWidth = imageHeight * 1.63;
   const shouldBlink = size >= 28;
@@ -1175,7 +1205,7 @@ function EliMark({
                 width: '34%',
                 height: 4,
                 borderRadius: 999,
-                bgcolor: isWaiting ? theme.palette.warning.main : markColor,
+                bgcolor: isWaiting ? tokens.decision : markColor,
                 transform: index === 0 ? 'rotate(-82deg)' : index === 1 ? 'rotate(-46deg)' : 'rotate(2deg)',
                 opacity: index === 2 ? 0.82 : 1,
               }}
@@ -1254,15 +1284,30 @@ function FolderRow({
   );
 }
 
-function TaskRow({ task, active }: { task: AgentTask; active: boolean }) {
+function TaskRow({ task, active, onSelect }: { task: AgentTask; active: boolean; onSelect: () => void }) {
   return (
-    <Box
+    <ButtonBase
+      onClick={onSelect}
+      aria-pressed={active}
+      aria-label={`View request: ${task.prompt}`}
       sx={{
+        width: '100%',
+        display: 'block',
+        textAlign: 'left',
         border: '1px solid',
         borderColor: active ? alpha(theme.palette.primary.main, 0.32) : tokens.line,
         borderRadius: 1,
         p: 0.75,
         bgcolor: active ? tokens.ultramarineWash : tokens.panelSolid,
+        transition: 'background-color 160ms ease-out, border-color 160ms ease-out',
+        '&:hover': {
+          borderColor: active ? alpha(theme.palette.primary.main, 0.42) : alpha(tokens.ultramarine, 0.24),
+          bgcolor: active ? tokens.ultramarineWash : alpha(tokens.ultramarine, 0.035),
+        },
+        '&:focus-visible': {
+          outline: `2px solid ${alpha(tokens.ultramarine, 0.4)}`,
+          outlineOffset: 2,
+        },
       }}
     >
       <Stack spacing={0.45}>
@@ -1277,7 +1322,7 @@ function TaskRow({ task, active }: { task: AgentTask; active: boolean }) {
           {task.prompt}
         </Typography>
       </Stack>
-    </Box>
+    </ButtonBase>
   );
 }
 
@@ -1327,7 +1372,7 @@ function PermissionRow({
   return (
     <Box
       sx={{
-        border: `1px solid ${alpha(theme.palette.warning.main, 0.22)}`,
+        border: `1px solid ${tokens.decisionLine}`,
         bgcolor: tokens.panelSolid,
         borderRadius: 1,
         p: 0.8,
@@ -1340,8 +1385,8 @@ function PermissionRow({
               width: 24,
               height: 24,
               borderRadius: '50%',
-              bgcolor: alpha(theme.palette.warning.main, 0.1),
-              color: theme.palette.warning.main,
+              bgcolor: tokens.decisionSurface,
+              color: tokens.decisionDark,
               display: 'grid',
               placeItems: 'center',
               flexShrink: 0,
@@ -1370,7 +1415,7 @@ function PermissionRow({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              bgcolor: alpha(theme.palette.warning.main, 0.07),
+              bgcolor: tokens.decisionSurface,
               borderRadius: 0.8,
               px: 0.7,
               py: 0.35,
@@ -1383,7 +1428,21 @@ function PermissionRow({
           <Button size="small" variant="contained" startIcon={<CheckCircleRounded />} onClick={onAllow} sx={{ flex: '1 1 104px' }}>
             Allow once
           </Button>
-          <Button size="small" variant="outlined" color="warning" startIcon={<CheckCircleRounded />} onClick={onAllowForRun} sx={{ flex: '1 1 104px' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<CheckCircleRounded />}
+            onClick={onAllowForRun}
+            sx={{
+              flex: '1 1 104px',
+              color: tokens.decisionDark,
+              borderColor: alpha(tokens.decision, 0.5),
+              '&:hover': {
+                borderColor: tokens.decision,
+                bgcolor: alpha(tokens.decision, 0.08),
+              },
+            }}
+          >
             Allow run
           </Button>
           <Button size="small" variant="text" color="inherit" startIcon={<CloseRounded />} onClick={onDeny} sx={{ px: 0.8 }}>
@@ -1620,10 +1679,10 @@ function timelineToneStyles(tone: TimelineTone) {
 
   if (tone === 'warning') {
     return {
-      bg: alpha(theme.palette.warning.main, 0.055),
-      border: alpha(theme.palette.warning.main, 0.2),
-      color: theme.palette.warning.dark,
-      iconBg: alpha(theme.palette.warning.main, 0.1),
+      bg: alpha(tokens.decision, 0.06),
+      border: alpha(tokens.decision, 0.24),
+      color: tokens.decisionDark,
+      iconBg: alpha(tokens.decision, 0.1),
     };
   }
 
@@ -1680,7 +1739,23 @@ function TaskStateChip({ task, inverted = false }: { task: AgentTask; inverted?:
     : { fontWeight: 760 };
 
   if (task.waitReason === 'approval') {
-    return <Chip size="small" label="Needs decision" color={inverted ? 'default' : 'warning'} variant={inverted ? 'outlined' : 'filled'} sx={invertedSx} />;
+    return (
+      <Chip
+        size="small"
+        label="Needs decision"
+        variant={inverted ? 'outlined' : 'filled'}
+        sx={
+          inverted
+            ? invertedSx
+            : {
+                bgcolor: tokens.decision,
+                color: '#fbfaff',
+                borderColor: tokens.decision,
+                fontWeight: 760,
+              }
+        }
+      />
+    );
   }
 
   if (task.phase === 'running') {
