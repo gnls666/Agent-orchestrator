@@ -528,6 +528,7 @@ export function App() {
                   value={folderPath}
                   onChange={(event) => setFolderPath(event.target.value)}
                   placeholder="Paste path as fallback"
+                  slotProps={{ htmlInput: { 'aria-label': 'Paste path as fallback' } }}
                   fullWidth
                 />
                 <Tooltip title="Add pasted path">
@@ -621,66 +622,15 @@ export function App() {
             <Stack spacing={1} sx={{ height: '100%', minHeight: 0 }}>
               <Box
                 sx={{
-                  border: `1px solid ${eliIsRunning ? alpha('#ffffff', 0.22) : tokens.line}`,
-                  bgcolor: eliIsRunning ? '#1837f2' : tokens.panelSolid,
-                  backgroundImage: eliIsRunning ? 'linear-gradient(135deg, #122bf1 0%, #2446ff 54%, #142fdc 100%)' : 'none',
+                  border: `1px solid ${tokens.line}`,
+                  bgcolor: tokens.panelSolid,
                   borderRadius: 1,
-                  p: eliIsRunning ? 1.25 : 0.95,
-                  boxShadow: eliIsRunning ? '0 14px 28px rgba(37, 58, 145, 0.16)' : 'none',
-                  minHeight: eliIsRunning ? 180 : undefined,
+                  p: 0.95,
+                  boxShadow: 'none',
                   overflow: 'hidden',
                   position: 'relative',
-                  '@keyframes eliRunSceneActive': {
-                    '0%, 52%, 100%': { opacity: 0 },
-                    '62%, 88%': { opacity: 1 },
-                  },
                 }}
               >
-                {eliIsRunning && (
-                  <Box
-                    aria-hidden
-                    sx={{
-                      position: 'absolute',
-                      inset: 0,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    <Box
-                      component="img"
-                      src={eliBlueIdleUrl}
-                      alt=""
-                      sx={{
-                        position: 'absolute',
-                        right: { xs: -92, md: 6 },
-                        top: '50%',
-                        width: { xs: 310, md: 330 },
-                        height: { xs: 190, md: 202 },
-                        transform: 'translateY(-50%)',
-                        objectFit: 'cover',
-                        opacity: { xs: 0.32, md: 1 },
-                      }}
-                    />
-                    <Box
-                      component="img"
-                      src={eliBlueActiveUrl}
-                      alt=""
-                      sx={{
-                        position: 'absolute',
-                        right: { xs: -92, md: 6 },
-                        top: '50%',
-                        width: { xs: 310, md: 330 },
-                        height: { xs: 190, md: 202 },
-                        transform: 'translateY(-50%)',
-                        objectFit: 'cover',
-                        opacity: 0,
-                        animation: 'eliRunSceneActive 2.6s ease-in-out infinite',
-                        '@media (prefers-reduced-motion: reduce)': {
-                          animation: 'none !important',
-                        },
-                      }}
-                    />
-                  </Box>
-                )}
                 <Stack
                   direction={{ xs: 'column', md: 'row' }}
                   spacing={1}
@@ -688,19 +638,18 @@ export function App() {
                     alignItems: { md: 'center' },
                     position: 'relative',
                     zIndex: 1,
-                    maxWidth: eliIsRunning ? { md: '48%' } : undefined,
                   }}
                 >
-                  {!eliIsRunning && <EliMark active={eliIsActive} tone={eliNeedsDecision ? 'waiting' : 'active'} size={34} />}
+                  <EliMark active={eliIsActive} tone={eliNeedsDecision ? 'waiting' : 'active'} size={34} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body1" sx={{ color: eliIsRunning ? '#ffffff' : tokens.ink, fontWeight: 760 }} noWrap>
+                    <Typography variant="body1" sx={{ color: tokens.ink, fontWeight: 760 }} noWrap>
                       {activeStatusText}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: eliIsRunning ? alpha('#ffffff', 0.74) : tokens.muted, mt: 0.15 }}>
+                    <Typography variant="body2" sx={{ color: tokens.muted, mt: 0.15 }}>
                       {currentActivityText}
                     </Typography>
                   </Box>
-                  {activeTask && <TaskStateChip task={activeTask} inverted={eliIsRunning} />}
+                  {activeTask && <TaskStateChip task={activeTask} />}
                 </Stack>
               </Box>
 

@@ -74,33 +74,102 @@ async function openFolderPicker(): Promise<string> {
         '-e',
         'POSIX path of (choose folder with prompt "Choose a workspace folder")',
       ]);
-      return stdout.trim();
+      return normalizePickedFolderPath(stdout, platform);
     }
 
     if (platform === 'win32') {
-      const script = [
-        'Add-Type -AssemblyName System.Windows.Forms;',
-        '$dialog = New-Object System.Windows.Forms.FolderBrowserDialog;',
-        '$dialog.Description = "Choose a workspace folder";',
-        '$dialog.ShowNewFolderButton = $false;',
-        'if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {',
-        '  [Console]::WriteLine($dialog.SelectedPath)',
-        '} else {',
-        '  exit 1',
-        '}',
-      ].join(' ');
-      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-STA', '-Command', script]);
-      return stdout.trim();
+      return normalizePickedFolderPath(await openWindowsFolderPicker(), platform);
+    }
+
+    if (isWsl()) {
+      try {
+        return normalizePickedFolderPath(await openWindowsFolderPicker(), platform);
+      } catch {
+        // Fall back to Linux desktop pickers below when WSL interop is unavailable.
+      }
     }
 
     const { stdout } = await execFileAsync('sh', [
       '-lc',
       'if command -v zenity >/dev/null 2>&1; then zenity --file-selection --directory --title="Choose a workspace folder"; elif command -v kdialog >/dev/null 2>&1; then kdialog --getexistingdirectory "$HOME"; else exit 127; fi',
     ]);
-    return stdout.trim();
+    return normalizePickedFolderPath(stdout, platform);
   } catch {
-    throw new Error('Folder selection canceled or unavailable');
+    throw new Error('Folder picker unavailable. Paste a folder path below instead.');
   }
+}
+
+async function openWindowsFolderPicker(): Promise<string> {
+  const script = [
+    '$ErrorActionPreference = "Stop";',
+    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;',
+    'function Write-SelectedPath([string]$path) {',
+    '  if ([string]::IsNullOrWhiteSpace($path)) { exit 1 }',
+    '  [Console]::WriteLine($path);',
+    '}',
+    'try {',
+    '  Add-Type -AssemblyName System.Windows.Forms;',
+    '  $dialog = New-Object System.Windows.Forms.FolderBrowserDialog;',
+    '  $dialog.Description = "Choose a workspace folder";',
+    '  $dialog.ShowNewFolderButton = $false;',
+    '  $owner = New-Object System.Windows.Forms.Form;',
+    '  $owner.TopMost = $true;',
+    '  $owner.ShowInTaskbar = $false;',
+    '  $result = $dialog.ShowDialog($owner);',
+    '  $owner.Dispose();',
+    '  if ($result -eq [System.Windows.Forms.DialogResult]::OK) { Write-SelectedPath $dialog.SelectedPath; exit 0 }',
+    '  exit 1;',
+    '} catch {',
+    '  $shell = New-Object -ComObject Shell.Application;',
+    '  $folder = $shell.BrowseForFolder(0, "Choose a workspace folder", 0, 0);',
+    '  if ($folder -ne $null) { Write-SelectedPath $folder.Self.Path; exit 0 }',
+    '  exit 1;',
+    '}',
+  ].join(' ');
+  const { stdout } = await execFileAsync('powershell.exe', [
+    '-NoProfile',
+    '-STA',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-Command',
+    script,
+  ]);
+
+  return stdout;
+}
+
+export function normalizePickedFolderPath(rawPath: string, hostPlatform: NodeJS.Platform = os.platform()): string {
+  const pickedPath = rawPath.trim().replace(/\r/g, '');
+
+  if (!pickedPath) {
+    throw new Error('Path is required');
+  }
+
+  if (hostPlatform === 'linux') {
+    const wslUncMatch = /^\\\\wsl(?:\.localhost|\$)?\\[^\\]+\\(.+)$/i.exec(pickedPath);
+
+    if (wslUncMatch?.[1]) {
+      return `/${wslUncMatch[1].replace(/\\/g, '/')}`;
+    }
+
+    const windowsDriveMatch = /^([a-zA-Z]):[\\/]*(.*)$/.exec(pickedPath);
+
+    if (windowsDriveMatch) {
+      const drive = windowsDriveMatch[1].toLowerCase();
+      const rest = windowsDriveMatch[2].replace(/\\/g, '/').replace(/^\/+/, '');
+      return rest ? `/mnt/${drive}/${rest}` : `/mnt/${drive}`;
+    }
+  }
+
+  return pickedPath;
+}
+
+function isWsl(): boolean {
+  if (os.platform() !== 'linux') {
+    return false;
+  }
+
+  return /microsoft|wsl/i.test(`${os.release()} ${os.version()}`);
 }
 
 function stableFolderId(folderPath: string): string {

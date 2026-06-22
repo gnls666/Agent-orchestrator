@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { scanFolder } from './folders';
+import { normalizePickedFolderPath, scanFolder } from './folders';
 
 const execFileAsync = promisify(execFile);
 
@@ -74,5 +74,20 @@ describe('scanFolder', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('normalizePickedFolderPath', () => {
+  it('keeps native Windows paths unchanged on Windows', () => {
+    expect(normalizePickedFolderPath('C:\\Users\\Ada\\project\r\n', 'win32')).toBe('C:\\Users\\Ada\\project');
+  });
+
+  it('maps Windows drive paths to WSL mount paths on Linux', () => {
+    expect(normalizePickedFolderPath('C:\\Users\\Ada\\project\r\n', 'linux')).toBe('/mnt/c/Users/Ada/project');
+    expect(normalizePickedFolderPath('D:/work/repo', 'linux')).toBe('/mnt/d/work/repo');
+  });
+
+  it('maps WSL UNC paths to Linux paths', () => {
+    expect(normalizePickedFolderPath('\\\\wsl.localhost\\Ubuntu\\home\\ada\\repo', 'linux')).toBe('/home/ada/repo');
   });
 });
