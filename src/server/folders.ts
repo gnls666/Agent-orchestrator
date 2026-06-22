@@ -7,6 +7,12 @@ import type { FolderRecord, GitHubCopilotAsset, GitInfo } from '../shared/types'
 import { readBundledSkillAssets } from './builtinSkills';
 
 const execFileAsync = promisify(execFile);
+type ExecFileLike = (command: string, args: string[]) => Promise<{ stdout: string }>;
+type FolderPickerRuntime = {
+  platform?: NodeJS.Platform;
+  isWsl?: boolean;
+  execFile?: ExecFileLike;
+};
 const instructionFileCandidates = [
   'AGENTS.md',
   '.github/copilot-instructions.md',
@@ -44,7 +50,7 @@ export async function scanFolder(inputPath: string): Promise<FolderRecord> {
 }
 
 export async function pickFolder(): Promise<FolderRecord> {
-  const selectedPath = await openFolderPicker();
+  const selectedPath = await pickFolderPath();
   return scanFolder(selectedPath);
 }
 
@@ -66,12 +72,15 @@ export function resolveInputPath(inputPath: string): string {
   return path.resolve(trimmed);
 }
 
-async function openFolderPicker(): Promise<string> {
-  const platform = os.platform();
+export async function pickFolderPath(runtime: FolderPickerRuntime = {}): Promise<string> {
+  const platform = runtime.platform ?? os.platform();
+  const runningInWsl = runtime.isWsl ?? isWsl();
+  const run = runtime.execFile ?? ((command, args) => execFileAsync(command, args));
+  let priorError: unknown;
 
   try {
     if (platform === 'darwin') {
-      const { stdout } = await execFileAsync('osascript', [
+      const { stdout } = await run('osascript', [
         '-e',
         'POSIX path of (choose folder with prompt "Choose a workspace folder")',
       ]);
@@ -79,28 +88,29 @@ async function openFolderPicker(): Promise<string> {
     }
 
     if (platform === 'win32') {
-      return normalizePickedFolderPath(await openWindowsFolderPicker(), platform);
+      return normalizePickedFolderPath(await openWindowsFolderPicker(run, platform, runningInWsl), platform);
     }
 
-    if (isWsl()) {
+    if (runningInWsl) {
       try {
-        return normalizePickedFolderPath(await openWindowsFolderPicker(), platform);
-      } catch {
+        return normalizePickedFolderPath(await openWindowsFolderPicker(run, platform, runningInWsl), platform);
+      } catch (error) {
+        priorError = error;
         // Fall back to Linux desktop pickers below when WSL interop is unavailable.
       }
     }
 
-    const { stdout } = await execFileAsync('sh', [
+    const { stdout } = await run('sh', [
       '-lc',
       'if command -v zenity >/dev/null 2>&1; then zenity --file-selection --directory --title="Choose a workspace folder"; elif command -v kdialog >/dev/null 2>&1; then kdialog --getexistingdirectory "$HOME"; else exit 127; fi',
     ]);
     return normalizePickedFolderPath(stdout, platform);
-  } catch {
-    throw new Error('Folder picker unavailable. Paste a folder path below instead.');
+  } catch (error) {
+    throw new Error(buildFolderPickerUnavailableMessage(platform, runningInWsl, error, priorError));
   }
 }
 
-async function openWindowsFolderPicker(): Promise<string> {
+async function openWindowsFolderPicker(run: ExecFileLike, platform: NodeJS.Platform, runningInWsl: boolean): Promise<string> {
   const script = [
     '$ErrorActionPreference = "Stop";',
     '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;',
@@ -127,16 +137,25 @@ async function openWindowsFolderPicker(): Promise<string> {
     '  exit 1;',
     '}',
   ].join(' ');
-  const { stdout } = await execFileAsync('powershell.exe', [
-    '-NoProfile',
-    '-STA',
-    '-ExecutionPolicy',
-    'Bypass',
-    '-Command',
-    script,
-  ]);
+  let lastError: unknown;
 
-  return stdout;
+  for (const command of windowsPowerShellCommands(platform, runningInWsl)) {
+    try {
+      const { stdout } = await run(command, [
+        '-NoProfile',
+        '-STA',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        script,
+      ]);
+      return stdout;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('No Windows folder picker command succeeded');
 }
 
 export function normalizePickedFolderPath(rawPath: string, hostPlatform: NodeJS.Platform = os.platform()): string {
@@ -171,6 +190,38 @@ function isWsl(): boolean {
   }
 
   return /microsoft|wsl/i.test(`${os.release()} ${os.version()}`);
+}
+
+function windowsPowerShellCommands(platform: NodeJS.Platform, runningInWsl: boolean): string[] {
+  if (platform === 'win32') {
+    return ['powershell.exe', 'pwsh.exe'];
+  }
+
+  if (runningInWsl) {
+    return [
+      '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+      '/mnt/c/Program Files/PowerShell/7/pwsh.exe',
+      'powershell.exe',
+      'pwsh.exe',
+    ];
+  }
+
+  return ['powershell.exe', 'pwsh.exe'];
+}
+
+function buildFolderPickerUnavailableMessage(
+  platform: NodeJS.Platform,
+  runningInWsl: boolean,
+  error: unknown,
+  priorError?: unknown,
+): string {
+  const platformLabel = platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : runningInWsl ? 'Windows/WSL' : 'Linux';
+  const detail = error instanceof Error && error.message ? ` Last error: ${error.message}` : '';
+  const earlierDetail =
+    priorError instanceof Error && priorError.message && priorError !== error
+      ? ` Earlier Windows picker error: ${priorError.message}`
+      : '';
+  return `Folder picker unavailable on ${platformLabel}. Paste a folder path below instead.${detail}${earlierDetail}`;
 }
 
 function stableFolderId(folderPath: string): string {

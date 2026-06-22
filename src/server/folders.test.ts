@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { describe, expect, it } from 'vitest';
-import { normalizePickedFolderPath, scanFolder } from './folders';
+import { describe, expect, it, vi } from 'vitest';
+import { normalizePickedFolderPath, pickFolderPath, scanFolder } from './folders';
 
 const execFileAsync = promisify(execFile);
 
@@ -136,5 +136,59 @@ describe('normalizePickedFolderPath', () => {
 
   it('maps WSL UNC paths to Linux paths', () => {
     expect(normalizePickedFolderPath('\\\\wsl.localhost\\Ubuntu\\home\\ada\\repo', 'linux')).toBe('/home/ada/repo');
+  });
+});
+
+describe('pickFolderPath', () => {
+  it('uses a mounted Windows PowerShell path when running inside WSL without Windows PATH interop', async () => {
+    const execFile = vi.fn(async (command: string) => {
+      if (command === '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe') {
+        return { stdout: 'C:\\Users\\Ada\\project\r\n' };
+      }
+
+      throw new Error(`spawn ${command} ENOENT`);
+    });
+
+    await expect(
+      pickFolderPath({
+        platform: 'linux',
+        isWsl: true,
+        execFile,
+      }),
+    ).resolves.toBe('/mnt/c/Users/Ada/project');
+  });
+
+  it('includes the underlying Windows picker failure when every candidate fails', async () => {
+    const execFile = vi.fn(async (command: string) => {
+      throw new Error(`spawn ${command} ENOENT`);
+    });
+
+    await expect(
+      pickFolderPath({
+        platform: 'win32',
+        isWsl: false,
+        execFile,
+      }),
+    ).rejects.toThrow('Folder picker unavailable on Windows. Paste a folder path below instead. Last error: spawn pwsh.exe ENOENT');
+  });
+
+  it('keeps the Windows interop failure visible when WSL also lacks Linux desktop pickers', async () => {
+    const execFile = vi.fn(async (command: string) => {
+      if (command === 'sh') {
+        throw new Error('Command failed: sh');
+      }
+
+      throw new Error(`spawn ${command} ENOENT`);
+    });
+
+    await expect(
+      pickFolderPath({
+        platform: 'linux',
+        isWsl: true,
+        execFile,
+      }),
+    ).rejects.toThrow(
+      'Folder picker unavailable on Windows/WSL. Paste a folder path below instead. Last error: Command failed: sh Earlier Windows picker error: spawn pwsh.exe ENOENT',
+    );
   });
 });
