@@ -6,6 +6,13 @@ The repository includes a text archive that compresses the project files into on
 artifacts/agent-orchestrator.single.txt
 ```
 
+The same archive is also emitted as two smaller text parts:
+
+```bash
+artifacts/agent-orchestrator.single.part1.txt
+artifacts/agent-orchestrator.single.part2.txt
+```
+
 The archive is gzip-compressed JSON encoded as base64. Binary files such as PNG assets are stored as base64 entries inside the JSON payload.
 
 ## Create Or Refresh The Archive
@@ -17,6 +24,22 @@ npm run bundle:single
 ```
 
 The script excludes `.git`, `node_modules`, `dist`, and the existing archive itself.
+
+## Merge Split Parts
+
+The two part files are plain text chunks of the full archive. Keep the order exactly as `part1` then `part2`.
+
+On macOS or Linux:
+
+```bash
+cat artifacts/agent-orchestrator.single.part1.txt artifacts/agent-orchestrator.single.part2.txt > artifacts/agent-orchestrator.single.txt
+```
+
+On Windows:
+
+```powershell
+cmd /c copy /b artifacts\agent-orchestrator.single.part1.txt+artifacts\agent-orchestrator.single.part2.txt artifacts\agent-orchestrator.single.txt
+```
 
 ## Restore The Archive
 

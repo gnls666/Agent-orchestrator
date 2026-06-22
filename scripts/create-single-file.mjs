@@ -4,10 +4,17 @@ import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outPath = join(root, 'artifacts', 'agent-orchestrator.single.txt');
+const archiveFile = 'artifacts/agent-orchestrator.single.txt';
+const splitArchiveFiles = [
+  'artifacts/agent-orchestrator.single.part1.txt',
+  'artifacts/agent-orchestrator.single.part2.txt',
+];
+const outPath = join(root, archiveFile);
+const splitOutPaths = splitArchiveFiles.map((path) => join(root, path));
 const excludedDirs = new Set(['.git', 'node_modules', 'dist']);
 const excludedFiles = new Set([
-  'artifacts/agent-orchestrator.single.txt',
+  archiveFile,
+  ...splitArchiveFiles,
   'restored-agent-orchestrator',
 ]);
 
@@ -52,6 +59,15 @@ function walk(dir, files = []) {
   return files;
 }
 
+function splitTextByLine(text) {
+  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const midpoint = Math.ceil(lines.length / 2);
+  return [
+    lines.slice(0, midpoint).join(''),
+    lines.slice(midpoint).join(''),
+  ];
+}
+
 const files = walk(root).sort().map((path) => {
   const absolute = join(root, path);
   const buffer = readFileSync(absolute);
@@ -88,4 +104,14 @@ const output = [
 
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, output);
+const splitOutputs = splitTextByLine(output);
+if (splitOutputs.join('') !== output) {
+  throw new Error('Split archive parts do not reconstruct the full archive.');
+}
+splitOutPaths.forEach((path, index) => {
+  writeFileSync(path, splitOutputs[index]);
+});
 console.log(`Wrote ${toPosix(relative(root, outPath))} with ${files.length} files.`);
+splitOutPaths.forEach((path) => {
+  console.log(`Wrote ${toPosix(relative(root, path))}.`);
+});
