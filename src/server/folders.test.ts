@@ -50,6 +50,22 @@ describe('scanFolder', () => {
           description: 'Use MUI carefully.',
         },
         {
+          id: 'skill:builtin/skills/python-fastapi/SKILL.md',
+          kind: 'skill',
+          name: 'python-fastapi',
+          path: 'builtin/skills/python-fastapi/SKILL.md',
+          title: 'Python FastAPI',
+          description: 'Use when building or changing Python FastAPI services.',
+        },
+        {
+          id: 'skill:builtin/skills/react/SKILL.md',
+          kind: 'skill',
+          name: 'react',
+          path: 'builtin/skills/react/SKILL.md',
+          title: 'React',
+          description: 'Use when building or changing React user interfaces.',
+        },
+        {
           id: 'skill:.github/skills/reviewer/SKILL.md',
           kind: 'skill',
           name: 'reviewer',
@@ -57,6 +73,35 @@ describe('scanFolder', () => {
           title: 'Reviewer Skill',
           description: 'Check risks first.',
         },
+        {
+          id: 'skill:builtin/skills/typescript/SKILL.md',
+          kind: 'skill',
+          name: 'typescript',
+          path: 'builtin/skills/typescript/SKILL.md',
+          title: 'TypeScript',
+          description: 'Use when building or changing TypeScript code.',
+        },
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('adds bundled skills when the project has no GitHub Copilot skills', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'agent-orchestrator-'));
+
+    try {
+      await writeFile(path.join(dir, 'package.json'), JSON.stringify({ name: 'empty-target' }));
+
+      const folder = await scanFolder(dir);
+      const bundledSkills = folder.githubAssets.filter((asset) => asset.kind === 'skill' && asset.path.startsWith('builtin/skills/'));
+
+      expect(bundledSkills.map((skill) => skill.name)).toEqual(['python-fastapi', 'react', 'typescript']);
+      expect(bundledSkills.map((skill) => skill.title)).toEqual(['Python FastAPI', 'React', 'TypeScript']);
+      expect(bundledSkills.map((skill) => skill.id)).toEqual([
+        'skill:builtin/skills/python-fastapi/SKILL.md',
+        'skill:builtin/skills/react/SKILL.md',
+        'skill:builtin/skills/typescript/SKILL.md',
       ]);
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -80,6 +125,8 @@ describe('scanFolder', () => {
 describe('normalizePickedFolderPath', () => {
   it('keeps native Windows paths unchanged on Windows', () => {
     expect(normalizePickedFolderPath('C:\\Users\\Ada\\project\r\n', 'win32')).toBe('C:\\Users\\Ada\\project');
+    expect(normalizePickedFolderPath('C:\\Users\\Ada Lovelace\\My Project\r\n', 'win32')).toBe('C:\\Users\\Ada Lovelace\\My Project');
+    expect(normalizePickedFolderPath('\\\\server\\share\\project\r\n', 'win32')).toBe('\\\\server\\share\\project');
   });
 
   it('maps Windows drive paths to WSL mount paths on Linux', () => {

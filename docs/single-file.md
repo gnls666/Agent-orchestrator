@@ -26,6 +26,8 @@ To unfold the archive into a new directory:
 node scripts/restore-single-file.mjs artifacts/agent-orchestrator.single.txt restored-agent-orchestrator
 ```
 
+The restore script accepts archives copied through tools that convert line endings to CRLF or insert whitespace into the base64 body. It also validates every archived path, including Windows absolute paths, before writing files under the output directory.
+
 Then install and run normally:
 
 ```bash

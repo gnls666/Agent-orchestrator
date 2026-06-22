@@ -36,8 +36,9 @@ describe('buildTaskPrompt', () => {
       selectedSkillPaths: ['.github/skills/reviewer/SKILL.md'],
     });
 
-    expect(prompt).toContain('Project-defined Copilot assets selected by the user');
+    expect(prompt).toContain('Copilot assets selected by the user');
     expect(prompt).toContain('Agent: .github/agents/frontend.md');
     expect(prompt).toContain('Skill: .github/skills/reviewer/SKILL.md');
+    expect(prompt).toContain('Prefer these selected instructions when they are relevant to the task.');
   });
 });

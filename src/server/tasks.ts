@@ -41,9 +41,9 @@ function assetInstructions(input: BuildTaskPromptInput): string[] {
 
   return [
     '',
-    'Project-defined Copilot assets selected by the user:',
+    'Copilot assets selected by the user:',
     ...(input.selectedAgentPath ? [`- Agent: ${input.selectedAgentPath}`] : []),
     ...selectedSkillPaths.map((skillPath) => `- Skill: ${skillPath}`),
-    'Prefer these project-defined instructions when they are relevant to the task.',
+    'Prefer these selected instructions when they are relevant to the task.',
   ];
 }

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { FolderRecord, GitHubCopilotAsset, GitInfo } from '../shared/types';
+import { readBundledSkillAssets } from './builtinSkills';
 
 const execFileAsync = promisify(execFile);
 const instructionFileCandidates = [
@@ -245,12 +246,13 @@ async function readInstructionFiles(cwd: string): Promise<string[]> {
 }
 
 async function readGitHubCopilotAssets(cwd: string): Promise<GitHubCopilotAsset[]> {
-  const [agents, skills] = await Promise.all([
+  const [agents, skills, bundledSkills] = await Promise.all([
     readMarkdownAssets(cwd, 'agent', path.join('.github', 'agents')),
     readSkillAssets(cwd),
+    readBundledSkillAssets(),
   ]);
 
-  return [...agents, ...skills].sort((a, b) => `${a.kind}:${a.name}`.localeCompare(`${b.kind}:${b.name}`));
+  return [...agents, ...bundledSkills, ...skills].sort((a, b) => `${a.kind}:${a.name}`.localeCompare(`${b.kind}:${b.name}`));
 }
 
 async function readMarkdownAssets(cwd: string, kind: GitHubCopilotAsset['kind'], relativeDir: string): Promise<GitHubCopilotAsset[]> {

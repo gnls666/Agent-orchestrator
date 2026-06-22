@@ -8,6 +8,7 @@ import { pickFolder, scanFolder } from './folders';
 import { normalizeModels } from './models';
 import { PermissionBroker } from './permissions';
 import { buildTaskPrompt } from './tasks';
+import { skillDirectoriesForSelectedSkills } from './builtinSkills';
 import type { AgentTask, FolderRecord, PermissionDecision, ServerEvent } from '../shared/types';
 
 const PORT = Number(process.env.PORT ?? 4317);
@@ -257,7 +258,7 @@ async function runTask(task: AgentTask, folder: FolderRecord): Promise<void> {
         },
       ]
     : undefined;
-  const skillDirectories = selectedSkills.length > 0 ? [path.join(folder.path, '.github', 'skills')] : undefined;
+  const skillDirectories = skillDirectoriesForSelectedSkills(folder.path, selectedSkills);
   const session = await client.createSession({
     clientName: 'agent-orchestrator',
     model: task.model,

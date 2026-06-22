@@ -167,9 +167,14 @@ const tokens = {
   decisionLine: '#c9c2ff',
   dangerSoft: '#fff1f2',
 };
-const eliAgentUrl = new URL('./assets/eli-agent.png', import.meta.url).href;
-const eliBlueIdleUrl = new URL('./assets/eli-blue-idle.png', import.meta.url).href;
-const eliBlueActiveUrl = new URL('./assets/eli-blue-active.png', import.meta.url).href;
+const eliBlueAvatarAspectRatio = 1008 / 702;
+const eliWhiteAvatarAspectRatio = 608 / 466;
+const eliBlueDefaultUrl = new URL('./assets/eli-blue-default-v2.png', import.meta.url).href;
+const eliBlueThinkingBaseUrl = new URL('./assets/eli-blue-thinking-base-v2.png', import.meta.url).href;
+const eliBlueThinkingIndicatorUrl = new URL('./assets/eli-blue-thinking-indicator-v2.png', import.meta.url).href;
+const eliWhiteDefaultUrl = new URL('./assets/eli-white-default-clean-v2.png', import.meta.url).href;
+const eliWhiteThinkingUrl = new URL('./assets/eli-white-thinking-clean-v2.png', import.meta.url).href;
+const eliWhiteThinkingLoopUrl = new URL('./assets/eli-white-thinking-loop-clean-v2.webp', import.meta.url).href;
 
 export function App() {
   const queryClient = useQueryClient();
@@ -456,13 +461,13 @@ export function App() {
             alignItems: 'center',
             gap: 1.5,
             borderBottom: `1px solid ${alpha('#ffffff', 0.18)}`,
-            bgcolor: '#1837f2',
-            backgroundImage: 'linear-gradient(135deg, #122bf1 0%, #2446ff 48%, #142fdc 100%)',
+            bgcolor: '#1a34f6',
+            backgroundImage: 'linear-gradient(135deg, #1a34f6 0%, #1a31fc 48%, #1a2cfc 100%)',
             color: '#ffffff',
-            boxShadow: '0 14px 30px rgba(37, 58, 145, 0.2)',
+            boxShadow: '0 14px 30px rgba(26, 52, 246, 0.2)',
           }}
         >
-          <Stack direction="row" spacing={1.2} sx={{ minWidth: 0, alignItems: 'center' }}>
+          <Stack direction="row" spacing={0.65} sx={{ minWidth: 0, alignItems: 'center' }}>
             <EliMark active={eliIsActive} tone={eliNeedsDecision ? 'waiting' : 'active'} size={48} contrast="blue" />
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6" sx={{ lineHeight: 1.05, fontSize: 16, letterSpacing: 0 }}>
@@ -564,7 +569,7 @@ export function App() {
 
               <Divider />
 
-              <SectionLabel icon={<AutoAwesomeRounded fontSize="small" />} text="Project abilities" />
+              <SectionLabel icon={<AutoAwesomeRounded fontSize="small" />} text="Abilities" />
               {selectedFolder ? (
                 <Stack spacing={0.75}>
                   <FormControl size="small" fullWidth disabled={folderAgents.length === 0}>
@@ -611,7 +616,7 @@ export function App() {
                   </FormControl>
 
                   {selectedFolder.githubAssets.length === 0 ? (
-                    <EmptyState text="No .github agents or skills found." />
+                    <EmptyState text="No project agents or skills found." />
                   ) : (
                     <Stack spacing={0.8}>
                       {selectedFolder.githubAssets.map((asset) => (
@@ -648,7 +653,7 @@ export function App() {
                     zIndex: 1,
                   }}
                 >
-                  <EliMark active={eliIsActive} tone={eliNeedsDecision ? 'waiting' : 'active'} size={34} />
+                  <EliMark active={eliIsActive} tone={eliNeedsDecision ? 'waiting' : 'active'} size={36} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body1" sx={{ color: tokens.ink, fontWeight: 760 }} noWrap>
                       {activeStatusText}
@@ -884,12 +889,37 @@ export function App() {
 
               <Divider />
 
-              <SectionLabel icon={<FolderRounded fontSize="small" />} text="Project context" />
-              {selectedFolder ? (
-                <ProjectContextSummary folder={selectedFolder} agentCount={folderAgents.length} skillCount={folderSkills.length} />
-              ) : (
-                <EmptyState text="Select a folder." />
-              )}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: 0,
+                  gap: 0.8,
+                }}
+              >
+                <SectionLabel icon={<FolderRounded fontSize="small" />} text="Project context" />
+                {selectedFolder ? (
+                  <ProjectContextSummary
+                    folder={selectedFolder}
+                    agentCount={folderAgents.length}
+                    skillCount={folderSkills.length}
+                    relaxed={permissions.length === 0}
+                  />
+                ) : (
+                  <EmptyState
+                    text="Select a folder."
+                    sx={
+                      permissions.length === 0
+                        ? {
+                            minHeight: { xs: 126, lg: 156 },
+                            display: 'flex',
+                            alignItems: 'center',
+                          }
+                        : undefined
+                    }
+                  />
+                )}
+              </Box>
             </Stack>
           </Panel>
         </Box>
@@ -948,15 +978,19 @@ function EliMark({
   size?: number;
   contrast?: 'blue' | 'light';
 }) {
-  const accent = tone === 'waiting' ? tokens.decision : tokens.ultramarine;
   const imageHeight = Math.max(18, size);
-  const imageWidth = imageHeight * 1.63;
-  const shouldBlink = size >= 28;
-  const isRunning = active && tone === 'active';
-  const isWaiting = active && tone === 'waiting';
-  const markColor = contrast === 'blue' ? '#f8fbff' : tokens.ultramarine;
-  const faceColor = '#6ff7ff';
-  const screenColor = '#263cff';
+  const imageWidth = imageHeight * (contrast === 'blue' ? eliBlueAvatarAspectRatio : eliWhiteAvatarAspectRatio);
+  const activeLabel = tone === 'waiting' ? 'waiting for a decision' : 'thinking';
+  const floatingAnimation = active ? 'eliThinkingFloat 2.8s ease-in-out infinite' : 'none';
+  const imageSx = {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    display: 'block',
+    pointerEvents: 'none',
+    userSelect: 'none',
+  } as const;
 
   if (contrast === 'blue') {
     return (
@@ -969,60 +1003,69 @@ function EliMark({
           flexShrink: 0,
           overflow: 'hidden',
           borderRadius: 1,
-          transformOrigin: '50% 72%',
-          animation: isRunning ? 'eliBlueFloat 2.6s ease-in-out infinite' : isWaiting ? 'eliBlueAttention 1.8s ease-in-out infinite' : 'none',
-          '@keyframes eliBlueFloat': {
-            '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(-0.2deg)' },
-            '50%': { transform: 'translate3d(0, -3%, 0) rotate(0.45deg)' },
-          },
-          '@keyframes eliBlueAttention': {
+          bgcolor: '#1a34f6',
+          isolation: 'isolate',
+          transformOrigin: '50% 70%',
+          animation: floatingAnimation,
+          willChange: active ? 'transform' : 'auto',
+          '@keyframes eliThinkingFloat': {
             '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(0deg)' },
-            '42%': { transform: 'translate3d(0, -2%, 0) rotate(-0.5deg)' },
-            '64%': { transform: 'translate3d(0, 1%, 0) rotate(0.35deg)' },
+            '50%': { transform: 'translate3d(0, -3%, 0) rotate(0.25deg)' },
           },
-          '@keyframes eliBlueActiveFrame': {
-            '0%, 54%, 100%': { opacity: 0 },
-            '62%, 88%': { opacity: 1 },
+          '@keyframes eliBlueIndicatorPulse': {
+            '0%, 100%': { opacity: 0.68, transform: 'scale(0.985)' },
+            '50%': { opacity: 1, transform: 'scale(1)' },
           },
           '@media (prefers-reduced-motion: reduce)': {
             animation: 'none !important',
             '& *': {
               animation: 'none !important',
+              transition: 'none !important',
             },
           },
         }}
-        aria-label="Eli"
+        role="img"
+        aria-label={`Eli, ${active ? activeLabel : 'ready'}`}
       >
         <Box
           component="img"
-          src={eliBlueIdleUrl}
+          src={eliBlueDefaultUrl}
           alt=""
+          aria-hidden="true"
           sx={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            display: 'block',
+            ...imageSx,
             objectFit: 'cover',
+            opacity: active ? 0 : 1,
+            transition: 'opacity 280ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         />
-        {active && (
-          <Box
-            component="img"
-            src={eliBlueActiveUrl}
-            alt=""
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              display: 'block',
-              objectFit: 'cover',
-              opacity: isRunning ? 0 : 1,
-              animation: isRunning ? 'eliBlueActiveFrame 2.6s ease-in-out infinite' : 'none',
-            }}
-          />
-        )}
+        <Box
+          component="img"
+          src={eliBlueThinkingBaseUrl}
+          alt=""
+          aria-hidden="true"
+          sx={{
+            ...imageSx,
+            objectFit: 'cover',
+            opacity: active ? 1 : 0,
+            transition: 'opacity 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        />
+        <Box
+          component="img"
+          src={eliBlueThinkingIndicatorUrl}
+          alt=""
+          aria-hidden="true"
+          sx={{
+            ...imageSx,
+            objectFit: 'cover',
+            opacity: active ? 0.68 : 0,
+            transform: active ? 'scale(0.985)' : 'scale(0.985)',
+            transformOrigin: '72.5% 25%',
+            transition: 'opacity 220ms ease-out',
+            animation: active ? 'eliBlueIndicatorPulse 1.2s ease-in-out infinite' : 'none',
+          }}
+        />
       </Box>
     );
   }
@@ -1035,157 +1078,60 @@ function EliMark({
         position: 'relative',
         display: 'block',
         flexShrink: 0,
-        filter: active
-          ? `drop-shadow(0 10px 14px ${alpha(accent, tone === 'waiting' ? 0.18 : 0.16)})`
-          : `drop-shadow(0 8px 12px ${alpha(tokens.ultramarineDark, 0.14)})`,
+        filter: 'none',
         transformOrigin: '50% 72%',
-        transition: 'filter 180ms ease-out, transform 180ms ease-out',
-        animation: isRunning ? 'eliFloat 2.6s ease-in-out infinite' : isWaiting ? 'eliAttention 1.8s ease-in-out infinite' : 'none',
-        '@keyframes eliFloat': {
-          '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(-0.2deg)' },
-          '50%': { transform: 'translate3d(0, -4%, 0) rotate(0.6deg)' },
-        },
-        '@keyframes eliAttention': {
+        animation: floatingAnimation,
+        willChange: active ? 'transform' : 'auto',
+        '@keyframes eliThinkingFloat': {
           '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(0deg)' },
-          '38%': { transform: 'translate3d(0, -3%, 0) rotate(-0.8deg)' },
-          '62%': { transform: 'translate3d(0, 1%, 0) rotate(0.5deg)' },
-        },
-        '@keyframes eliFaceSwap': {
-          '0%, 38%, 66%, 100%': { opacity: 0 },
-          '44%, 58%': { opacity: 1 },
-        },
-        '@keyframes eliRayPulse': {
-          '0%, 100%': { opacity: 0.35, transform: 'scale(0.92)' },
-          '45%': { opacity: 1, transform: 'scale(1)' },
-        },
-        '@keyframes eliRayPop': {
-          '0%, 72%, 100%': { opacity: 0, transform: 'scale(0.7)' },
-          '80%, 92%': { opacity: 1, transform: 'scale(1)' },
+          '50%': { transform: 'translate3d(0, -3%, 0) rotate(0.25deg)' },
         },
         '@media (prefers-reduced-motion: reduce)': {
           animation: 'none !important',
-          '& *': {
-            animation: 'none !important',
+          '& [data-eli-animated="true"]': {
+            display: 'none',
           },
         },
       }}
-      aria-label="Eli"
+      role="img"
+      aria-label={`Eli, ${active ? activeLabel : 'ready'}`}
     >
       <Box
         component="img"
-        src={eliAgentUrl}
+        src={eliWhiteDefaultUrl}
         alt=""
+        aria-hidden="true"
         sx={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          display: 'block',
+          ...imageSx,
           objectFit: 'contain',
+          opacity: active ? 0 : 1,
+          transition: 'opacity 220ms ease-out',
         }}
       />
-      {shouldBlink && isRunning && (
+      <Box
+        component="img"
+        src={eliWhiteThinkingUrl}
+        alt=""
+        aria-hidden="true"
+        sx={{
+          ...imageSx,
+          objectFit: 'contain',
+          opacity: active ? 1 : 0,
+          transition: 'opacity 220ms ease-out',
+        }}
+      />
+      {active && (
         <Box
-          aria-hidden
+          component="img"
+          src={eliWhiteThinkingLoopUrl}
+          alt=""
+          aria-hidden="true"
+          data-eli-animated="true"
           sx={{
-            position: 'absolute',
-            inset: 0,
-            opacity: 0,
-            animation: 'eliFaceSwap 2.6s ease-in-out infinite',
-            pointerEvents: 'none',
+            ...imageSx,
+            objectFit: 'contain',
           }}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              left: '34%',
-              top: '42%',
-              width: '14%',
-              height: '19%',
-              bgcolor: screenColor,
-              borderRadius: 1,
-              transform: 'rotate(45deg)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              left: '59%',
-              top: '38%',
-              width: '14%',
-              height: '19%',
-              bgcolor: screenColor,
-              borderRadius: 1,
-              transform: 'rotate(45deg)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              left: '38%',
-              top: '47%',
-              width: '11%',
-              height: '12%',
-              borderTop: `4px solid ${faceColor}`,
-              borderRadius: '999px 999px 0 0',
-              transform: 'rotate(-3deg)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              left: '62%',
-              top: '46%',
-              width: '10%',
-              height: '15%',
-              '&::before, &::after': {
-                content: '""',
-                position: 'absolute',
-                left: 0,
-                top: '45%',
-                width: '100%',
-                height: 4,
-                borderRadius: 999,
-                bgcolor: faceColor,
-                transformOrigin: '12% 50%',
-              },
-              '&::before': { transform: 'rotate(-38deg)' },
-              '&::after': { transform: 'rotate(38deg)' },
-            }}
-          />
-        </Box>
-      )}
-      {active && size >= 28 && (
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            left: '78%',
-            top: '-9%',
-            width: '24%',
-            height: '26%',
-            pointerEvents: 'none',
-            transformOrigin: '15% 85%',
-            animation: isRunning ? 'eliRayPulse 1.35s ease-in-out infinite' : 'eliRayPop 1.8s ease-out infinite',
-          }}
-        >
-          {[0, 1, 2].map((index) => (
-            <Box
-              key={index}
-              sx={{
-                position: 'absolute',
-                left: `${index * 22}%`,
-                top: index === 0 ? '14%' : index === 1 ? '32%' : '54%',
-                width: '34%',
-                height: 4,
-                borderRadius: 999,
-                bgcolor: isWaiting ? tokens.decision : markColor,
-                transform: index === 0 ? 'rotate(-82deg)' : index === 1 ? 'rotate(-46deg)' : 'rotate(2deg)',
-                opacity: index === 2 ? 0.82 : 1,
-              }}
-            />
-          ))}
-        </Box>
+        />
       )}
     </Box>
   );
@@ -1304,10 +1250,12 @@ function ProjectContextSummary({
   folder,
   agentCount,
   skillCount,
+  relaxed = false,
 }: {
   folder: FolderRecord;
   agentCount: number;
   skillCount: number;
+  relaxed?: boolean;
 }) {
   const stateParts = [
     folder.git.branch ?? 'No git repo',
@@ -1319,23 +1267,35 @@ function ProjectContextSummary({
   return (
     <Box
       sx={{
-        bgcolor: alpha(tokens.recessed, 0.58),
+        bgcolor: alpha(tokens.recessed, relaxed ? 0.4 : 0.58),
         borderRadius: 1,
-        px: 0.95,
-        py: 0.8,
+        px: relaxed ? 1.05 : 0.95,
+        py: relaxed ? 1.05 : 0.8,
+        minHeight: relaxed ? { xs: 210, lg: 250 } : undefined,
       }}
     >
-      <Stack spacing={0.6}>
-        <ProjectContextRow
-          label="Path"
-          value={folder.path}
-          sx={{
-            color: tokens.ink,
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            fontSize: 12,
-            wordBreak: 'break-word',
-          }}
-        />
+      <Stack spacing={relaxed ? 1.15 : 0.6}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="caption" sx={{ color: tokens.faint, fontWeight: 800 }}>
+            Path
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 0.35,
+              color: tokens.ink,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: 12,
+              lineHeight: 1.45,
+              wordBreak: 'break-word',
+            }}
+          >
+            {folder.path}
+          </Typography>
+        </Box>
+
+        {relaxed && <Divider sx={{ borderColor: alpha(tokens.lineStrong, 0.6) }} />}
+
         <ProjectContextRow label="State" value={stateParts.join(' · ')} emphasize={folder.git.dirty} />
         <ProjectContextRow label="Scripts" value={folder.scripts.length ? folder.scripts.join(', ') : 'None'} />
         <ProjectContextRow label="Instructions" value={folder.instructionFiles.length ? folder.instructionFiles.join(', ') : 'None'} />
@@ -1692,7 +1652,7 @@ function timelineIcon(kind: TimelineKind): ReactNode {
   const iconSx = { fontSize: 15 };
 
   if (kind === 'assistant') {
-    return <EliMark active={false} tone="active" size={18} />;
+    return <EliMark active={false} tone="active" size={16} />;
   }
 
   if (kind === 'reasoning') {
@@ -1774,9 +1734,9 @@ function SectionLabel({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function EmptyState({ text, sx }: { text: string; sx?: object }) {
   return (
-    <Box sx={{ borderRadius: 1, p: 0.9, color: 'text.secondary', bgcolor: alpha(tokens.recessed, 0.55) }}>
+    <Box sx={{ borderRadius: 1, p: 0.9, color: 'text.secondary', bgcolor: alpha(tokens.recessed, 0.55), ...sx }}>
       <Typography variant="body2">{text}</Typography>
     </Box>
   );

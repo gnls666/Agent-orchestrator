@@ -1,6 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, normalize, resolve } from 'node:path';
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep, win32 } from 'node:path';
 
 const [, , inputArg = 'artifacts/agent-orchestrator.single.txt', outputArg = 'restored-agent-orchestrator'] = process.argv;
 const inputPath = resolve(inputArg);
@@ -22,14 +22,12 @@ if (payload.format !== 'agent-orchestrator-single-file' || payload.version !== 1
 }
 
 for (const file of payload.files) {
-  if (!file.path || isAbsolute(file.path) || file.path.includes('..')) {
+  if (isUnsafeArchivePath(file.path)) {
     throw new Error(`Unsafe archive path: ${file.path}`);
   }
 
   const target = normalize(join(outputRoot, file.path));
-  if (!target.startsWith(outputRoot)) {
-    throw new Error(`Archive path escapes output directory: ${file.path}`);
-  }
+  assertInsideOutputRoot(target, file.path);
 
   mkdirSync(dirname(target), { recursive: true });
   const content = file.encoding === 'base64' ? Buffer.from(file.content, 'base64') : file.content;
@@ -41,3 +39,25 @@ for (const file of payload.files) {
 }
 
 console.log(`Restored ${payload.files.length} files to ${outputRoot}`);
+
+function isUnsafeArchivePath(archivePath) {
+  if (typeof archivePath !== 'string' || !archivePath) {
+    return true;
+  }
+
+  if (isAbsolute(archivePath) || win32.isAbsolute(archivePath)) {
+    return true;
+  }
+
+  return archivePath.split(/[\\/]+/).includes('..');
+}
+
+function assertInsideOutputRoot(target, archivePath) {
+  const relativeTarget = relative(outputRoot, target);
+
+  if (relativeTarget === '' || (!relativeTarget.startsWith('..') && !isAbsolute(relativeTarget) && !relativeTarget.startsWith(`${sep}${sep}`))) {
+    return;
+  }
+
+  throw new Error(`Archive path escapes output directory: ${archivePath}`);
+}
