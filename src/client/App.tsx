@@ -1784,8 +1784,15 @@ function EmptyState({ text }: { text: string }) {
 
 function StatusChip({ status }: { status: AgentTask['status'] }) {
   const color = status === 'idle' ? 'success' : status === 'failed' || status === 'aborted' ? 'error' : status === 'running' ? 'primary' : 'default';
+  const labelByStatus: Record<AgentTask['status'], string> = {
+    queued: 'queued',
+    running: 'running',
+    idle: 'ready',
+    failed: 'failed',
+    aborted: 'aborted',
+  };
 
-  return <Chip size="small" label={status} color={color} variant={status === 'running' ? 'filled' : 'outlined'} />;
+  return <Chip size="small" label={labelByStatus[status]} color={color} variant={status === 'running' ? 'filled' : 'outlined'} />;
 }
 
 function TaskStateChip({ task, inverted = false }: { task: AgentTask; inverted?: boolean }) {
