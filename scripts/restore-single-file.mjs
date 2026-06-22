@@ -6,7 +6,10 @@ const [, , inputArg = 'artifacts/agent-orchestrator.single.txt', outputArg = 're
 const inputPath = resolve(inputArg);
 const outputRoot = resolve(outputArg);
 const text = readFileSync(inputPath, 'utf8');
-const [header, encoded] = text.split('\n---\n');
+const separator = /\r?\n---\r?\n/;
+const separatorMatch = separator.exec(text);
+const header = separatorMatch ? text.slice(0, separatorMatch.index) : '';
+const encoded = separatorMatch ? text.slice(separatorMatch.index + separatorMatch[0].length) : '';
 
 if (!header?.startsWith('AGENT_ORCHESTRATOR_SINGLE_FILE_V1') || !encoded) {
   throw new Error('Invalid single-file archive header.');
