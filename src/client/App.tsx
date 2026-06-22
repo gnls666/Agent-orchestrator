@@ -1413,6 +1413,7 @@ function permissionActionLabel(kind: string): string {
 
 function ActivityItem({ row, hasNext }: { row: TimelineRow; hasNext: boolean }) {
   const tone = timelineToneStyles(row.presentation.tone);
+  const isAssistant = row.presentation.kind === 'assistant';
 
   return (
     <Box
@@ -1440,15 +1441,16 @@ function ActivityItem({ row, hasNext }: { row: TimelineRow; hasNext: boolean }) 
         )}
         <Box
           sx={{
-            width: 20,
-            height: 20,
-            borderRadius: '50%',
-            border: '1px solid',
+            width: isAssistant ? 24 : 20,
+            height: isAssistant ? 22 : 20,
+            borderRadius: isAssistant ? 0 : '50%',
+            border: isAssistant ? 'none' : '1px solid',
             borderColor: tone.border,
-            bgcolor: tone.iconBg,
+            bgcolor: isAssistant ? 'transparent' : tone.iconBg,
             color: tone.color,
             display: 'grid',
             placeItems: 'center',
+            overflow: 'visible',
             zIndex: 1,
           }}
         >
