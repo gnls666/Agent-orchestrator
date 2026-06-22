@@ -886,55 +886,7 @@ export function App() {
 
               <SectionLabel icon={<FolderRounded fontSize="small" />} text="Project context" />
               {selectedFolder ? (
-                <Stack spacing={0.8}>
-                  <Box
-                    sx={{
-                      border: `1px solid ${tokens.line}`,
-                      bgcolor: tokens.panelSolid,
-                      borderRadius: 1,
-                      p: 0.85,
-                      minWidth: 0,
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: tokens.faint, fontWeight: 800, textTransform: 'uppercase' }}>
-                      Path
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        mt: 0.25,
-                        color: tokens.ink,
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                        fontSize: 12,
-                        lineHeight: 1.35,
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {selectedFolder.path}
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.75 }}>
-                      {selectedFolder.git.branch ? (
-                        <Chip size="small" label={selectedFolder.git.branch} variant="outlined" />
-                      ) : (
-                        <Chip size="small" label="No git repo" variant="outlined" sx={{ color: tokens.muted }} />
-                      )}
-                      {selectedFolder.git.dirty && <Chip size="small" label="dirty" color="warning" variant="outlined" />}
-                      {selectedFolder.packageManager ? (
-                        <Chip size="small" label={selectedFolder.packageManager} variant="outlined" />
-                      ) : (
-                        <Chip size="small" label="No package" variant="outlined" sx={{ color: tokens.muted }} />
-                      )}
-                    </Box>
-                  </Box>
-
-                  <ProjectContextChips label="Scripts" values={selectedFolder.scripts} emptyText="None" />
-                  <ProjectContextChips label="Instructions" values={selectedFolder.instructionFiles} emptyText="None" />
-                  <ProjectContextChips
-                    label="Abilities"
-                    values={selectedFolder.githubAssets.length ? [`${folderAgents.length} agents`, `${folderSkills.length} skills`] : []}
-                    emptyText="None"
-                  />
-                </Stack>
+                <ProjectContextSummary folder={selectedFolder} agentCount={folderAgents.length} skillCount={folderSkills.length} />
               ) : (
                 <EmptyState text="Select a folder." />
               )}
@@ -1317,10 +1269,10 @@ function TaskRow({ task, active, onSelect }: { task: AgentTask; active: boolean;
         display: 'block',
         textAlign: 'left',
         border: '1px solid',
-        borderColor: active ? alpha(theme.palette.primary.main, 0.32) : tokens.line,
+        borderColor: active ? alpha(theme.palette.primary.main, 0.28) : 'transparent',
         borderRadius: 1,
         p: 0.75,
-        bgcolor: active ? tokens.ultramarineWash : tokens.panelSolid,
+        bgcolor: active ? tokens.ultramarineWash : 'transparent',
         transition: 'background-color 160ms ease-out, border-color 160ms ease-out',
         '&:hover': {
           borderColor: active ? alpha(theme.palette.primary.main, 0.42) : alpha(tokens.ultramarine, 0.24),
@@ -1348,56 +1300,88 @@ function TaskRow({ task, active, onSelect }: { task: AgentTask; active: boolean;
   );
 }
 
-function ProjectContextChips({ label, values, emptyText }: { label: string; values: string[]; emptyText: string }) {
+function ProjectContextSummary({
+  folder,
+  agentCount,
+  skillCount,
+}: {
+  folder: FolderRecord;
+  agentCount: number;
+  skillCount: number;
+}) {
+  const stateParts = [
+    folder.git.branch ?? 'No git repo',
+    folder.git.dirty ? 'dirty' : undefined,
+    folder.packageManager ?? 'No package',
+  ].filter((part): part is string => Boolean(part));
+  const abilities = folder.githubAssets.length ? `${agentCount} agents, ${skillCount} skills` : 'None';
+
   return (
     <Box
       sx={{
-        border: `1px solid ${tokens.line}`,
-        bgcolor: tokens.panelSolid,
+        bgcolor: alpha(tokens.recessed, 0.58),
         borderRadius: 1,
-        px: 0.8,
-        py: 0.7,
+        px: 0.95,
+        py: 0.8,
       }}
     >
-      <Stack direction="row" spacing={0.8} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
-        <Typography
-          variant="caption"
+      <Stack spacing={0.6}>
+        <ProjectContextRow
+          label="Path"
+          value={folder.path}
           sx={{
-            color: tokens.faint,
-            fontWeight: 800,
-            width: 72,
-            flexShrink: 0,
-            pt: 0.25,
-            textTransform: 'uppercase',
+            color: tokens.ink,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: 12,
+            wordBreak: 'break-word',
           }}
-        >
-          {label}
-        </Typography>
-        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexWrap: 'wrap', gap: 0.45 }}>
-          {values.length ? (
-            values.map((value) => (
-              <Chip
-                key={value}
-                size="small"
-                label={value}
-                variant="outlined"
-                sx={{
-                  maxWidth: '100%',
-                  '& .MuiChip-label': {
-                    display: 'block',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  },
-                }}
-              />
-            ))
-          ) : (
-            <Typography variant="body2" sx={{ color: tokens.muted }}>
-              {emptyText}
-            </Typography>
-          )}
-        </Box>
+        />
+        <ProjectContextRow label="State" value={stateParts.join(' · ')} emphasize={folder.git.dirty} />
+        <ProjectContextRow label="Scripts" value={folder.scripts.length ? folder.scripts.join(', ') : 'None'} />
+        <ProjectContextRow label="Instructions" value={folder.instructionFiles.length ? folder.instructionFiles.join(', ') : 'None'} />
+        <ProjectContextRow label="Abilities" value={abilities} />
       </Stack>
+    </Box>
+  );
+}
+
+function ProjectContextRow({
+  label,
+  value,
+  emphasize = false,
+  sx,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+  sx?: object;
+}) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: '92px minmax(0, 1fr)',
+        columnGap: 0.9,
+        alignItems: 'baseline',
+        minWidth: 0,
+      }}
+    >
+      <Typography variant="caption" sx={{ color: tokens.faint, fontWeight: 800 }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{
+          minWidth: 0,
+          color: emphasize ? tokens.ink : tokens.muted,
+          fontWeight: emphasize ? 680 : 520,
+          lineHeight: 1.35,
+          wordBreak: 'break-word',
+          ...sx,
+        }}
+      >
+        {value}
+      </Typography>
     </Box>
   );
 }
@@ -1792,7 +1776,7 @@ function SectionLabel({ icon, text }: { icon: ReactNode; text: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <Box sx={{ border: `1px dashed ${tokens.lineStrong}`, borderRadius: 1, p: 0.9, color: 'text.secondary', bgcolor: tokens.panelSolid }}>
+    <Box sx={{ borderRadius: 1, p: 0.9, color: 'text.secondary', bgcolor: alpha(tokens.recessed, 0.55) }}>
       <Typography variant="body2">{text}</Typography>
     </Box>
   );
